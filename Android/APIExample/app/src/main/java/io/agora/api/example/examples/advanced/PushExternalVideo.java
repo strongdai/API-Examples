@@ -1,6 +1,7 @@
 package io.agora.api.example.examples.advanced;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.opengl.EGLSurface;
@@ -15,9 +16,11 @@ import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.Spinner;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -26,6 +29,7 @@ import com.yanzhenjie.permission.AndPermission;
 import com.yanzhenjie.permission.runtime.Permission;
 
 import java.io.IOException;
+import java.nio.FloatBuffer;
 
 import io.agora.api.component.gles.ProgramTextureOES;
 import io.agora.api.component.gles.core.EglCore;
@@ -84,9 +88,23 @@ public class PushExternalVideo extends BaseFragment implements View.OnClickListe
     private Camera mCamera;
     private int mFacing = Camera.CameraInfo.CAMERA_FACING_FRONT;
     private boolean mPreviewing = false;
-    private int mSurfaceWidth;
+    private int mSurfaceWidth ;
     private int mSurfaceHeight;
     private boolean mTextureDestroyed;
+
+
+    private Spinner renderModelSpinner;
+    private Spinner impleModelSpinner;
+
+    private int render_model = 0;
+    private int imple_model = 0;
+    private int mScreenOri;
+    private float widthRatio;
+    private float heightRatio;
+    private TextureView textureView;
+    private int realWidth;
+    private int realHeight;
+
 
     @Nullable
     @Override
@@ -103,6 +121,38 @@ public class PushExternalVideo extends BaseFragment implements View.OnClickListe
         view.findViewById(R.id.btn_join).setOnClickListener(this);
         fl_local = view.findViewById(R.id.fl_local);
         fl_remote = view.findViewById(R.id.fl_remote);
+
+        renderModelSpinner = view.findViewById(R.id.render_model);
+        impleModelSpinner = view.findViewById(R.id.implement_type);
+
+        renderModelSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                render_model = position;
+                mMVPMatrixInit = false;
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
+        impleModelSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                imple_model = position;
+                mMVPMatrixInit = false;
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
+
+        mScreenOri = this.getResources().getConfiguration().orientation; //获取屏幕方向
     }
 
     @Override
@@ -195,14 +245,14 @@ public class PushExternalVideo extends BaseFragment implements View.OnClickListe
         }
 
         // Create render view by RtcEngine
-        TextureView textureView = new TextureView(getContext());
+        textureView = new TextureView(getContext());
         //add SurfaceTextureListener
         textureView.setSurfaceTextureListener(this);
         // Add to the local container
         fl_local.addView(textureView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         /**Set up to play remote sound with receiver*/
-        engine.setDefaultAudioRoutetoSpeakerphone(true);
+        engine.setDefaultAudioRoutetoSpeakerphone(false);
         engine.setEnableSpeakerphone(false);
 
         /** Sets the channel profile of the Agora RtcEngine.
@@ -285,26 +335,14 @@ public class PushExternalVideo extends BaseFragment implements View.OnClickListe
          *  happen when display frames to the screen.
          * The display transformation matrix does not change for the same camera when the screen
          *  orientation remains the same.*/
-        if (!mMVPMatrixInit) {
-            /***/
-            /**For simplicity, we only consider the activity as portrait mode. In this case, the captured
-             * images should be rotated 90 degrees (left or right).Thus the frame width and height
-             * should be swapped.*/
-            float frameRatio = DEFAULT_CAPTURE_HEIGHT / (float) DEFAULT_CAPTURE_WIDTH;
-            float surfaceRatio = mSurfaceWidth / (float) mSurfaceHeight;
-            Matrix.setIdentityM(mMVPMatrix, 0);
 
-            if (frameRatio >= surfaceRatio) {
-                float w = DEFAULT_CAPTURE_WIDTH * surfaceRatio;
-                float scaleW = DEFAULT_CAPTURE_HEIGHT / w;
-                Matrix.scaleM(mMVPMatrix, 0, scaleW, 1, 1);
-            } else {
-                float h = DEFAULT_CAPTURE_HEIGHT / surfaceRatio;
-                float scaleH = DEFAULT_CAPTURE_WIDTH / h;
-                Matrix.scaleM(mMVPMatrix, 0, 1, scaleH, 1);
-            }
+        if (!mMVPMatrixInit) {
+
+            fitVideoRender();
+
             mMVPMatrixInit = true;
         }
+
         GLES20.glViewport(0, 0, mSurfaceWidth, mSurfaceHeight);
         mProgram.drawFrame(mPreviewTexture, mTransform, mMVPMatrix);
         mEglCore.swapBuffers(mDrawSurface);
@@ -332,6 +370,159 @@ public class PushExternalVideo extends BaseFragment implements View.OnClickListe
             Log.e(TAG, "pushExternalVideoFrame:" + a);
         }
     }
+
+    private void fitVideoRender() {
+
+        Matrix.setIdentityM(mMVPMatrix, 0);
+
+        if(mScreenOri == this.getResources().getConfiguration().ORIENTATION_LANDSCAPE){
+            //横屏
+            widthRatio = DEFAULT_CAPTURE_WIDTH / (float) mSurfaceWidth;
+            heightRatio = DEFAULT_CAPTURE_HEIGHT / (float) mSurfaceHeight;
+        } else {
+            //竖屏
+            widthRatio = DEFAULT_CAPTURE_HEIGHT / (float) mSurfaceWidth;
+            heightRatio = DEFAULT_CAPTURE_WIDTH / (float) mSurfaceHeight;
+        }
+
+        int captureWidth = mScreenOri == this.getResources().getConfiguration().ORIENTATION_LANDSCAPE ? DEFAULT_CAPTURE_WIDTH : DEFAULT_CAPTURE_HEIGHT;
+        int captureHeight = mScreenOri == this.getResources().getConfiguration().ORIENTATION_LANDSCAPE ? DEFAULT_CAPTURE_HEIGHT : DEFAULT_CAPTURE_WIDTH;
+
+        if(render_model == 0) {
+            //留黑边(大边铺满，小边留黑边)
+            if(widthRatio >= heightRatio){
+                realWidth =  mSurfaceWidth;
+                realHeight = (int) (captureHeight / widthRatio);
+            }else{
+                //大边为高
+                realWidth = (int) (captureWidth / heightRatio);
+                realHeight = mSurfaceHeight;
+            }
+        }else{
+            //(小边铺满，大边放大)
+            if(widthRatio >= heightRatio){
+                realWidth = (int) (mSurfaceWidth / heightRatio);
+                realHeight = mSurfaceHeight;
+            }else{
+                //宽度铺满
+                realWidth =  mSurfaceWidth;
+                realHeight = (int) (mSurfaceHeight / widthRatio);
+            }
+        }
+
+        switch (imple_model){
+            case 0:
+                fitMatrix();
+                break;
+            case 1:
+                fitLayout();
+                break;
+            case 2:
+                fitGl();
+                break;
+        }
+    }
+
+    private static float FULL_RECTANGLE_COORDS[] = {
+            -1.0f, -1.0f,   // 0 bottom left
+            1.0f, -1.0f,   // 1 bottom right
+            -1.0f, 1.0f,   // 2 top left
+            1.0f, 1.0f,   // 3 top right
+    };
+    private static float FULL_RECTANGLE_TEX_COORDS[] = {
+            0.0f, 0.0f,     // 0 bottom left
+            1.0f, 0.0f,     // 1 bottom right
+            0.0f, 1.0f,     // 2 top left
+            1.0f, 1.0f      // 3 top right
+    };
+
+
+    private void fitGl() {
+
+        if(render_model == 0) {
+            //留黑边(大边铺满，小边留黑边)
+            if(widthRatio >= heightRatio){
+                //大边为宽
+                float scaleH = (realHeight * 1.0f) / mSurfaceHeight;
+                FULL_RECTANGLE_COORDS = new float[]{
+                        -1.0f, -1.0f + (1.0f - scaleH),   // 0 bottom left
+                        1.0f, -1.0f + (1.0f - scaleH),   // 1 bottom right
+                        -1.0f, 1.0f - (1.0f - scaleH),   // 2 top left
+                        1.0f, 1.0f - (1.0f - scaleH),   // 3 top right
+                };
+            }else{
+                //大边为高
+                float scaleW = (realWidth * 1.0f) / mSurfaceWidth;
+                FULL_RECTANGLE_COORDS = new float[]{
+                        -1.0f + (1.0f - scaleW), -1.0f,   // 0 bottom left
+                        1.0f - (1.0f - scaleW), -1.0f,   // 1 bottom right
+                        -1.0f + (1.0f - scaleW), 1.0f,   // 2 top left
+                        1.0f - (1.0f - scaleW), 1.0f,   // 3 top right
+                };
+            }
+        }else{
+            //裁剪(小边铺满，大边放大)
+            if(widthRatio >= heightRatio){
+                //高度铺满
+                float scaleW = (realWidth * 1.0f) / mSurfaceWidth;
+                FULL_RECTANGLE_COORDS = new float[]{
+                        -1.0f - (scaleW - 1.0f), -1.0f ,   // 0 bottom left
+                        1.0f + (scaleW - 1.0f), -1.0f,   // 1 bottom right
+                        -1.0f - (scaleW - 1.0f), 1.0f,   // 2 top left
+                        1.0f + (scaleW - 1.0f), 1.0f,   // 3 top right
+                };
+            }else{
+                //宽度铺满
+                float scaleH = (realHeight * 1.0f) / mSurfaceHeight;
+                FULL_RECTANGLE_COORDS = new float[]{
+                        -1.0f , -1.0f - (scaleH - 1.0f) ,   // 0 bottom left
+                        1.0f , -1.0f - (scaleH - 1.0f),   // 1 bottom right
+                        -1.0f, 1.0f + (scaleH - 1.0f),   // 2 top left
+                        1.0f , 1.0f + (scaleH - 1.0f),   // 3 top right
+                };
+            }
+        }
+
+
+        mProgram.updateVertexArray(FULL_RECTANGLE_COORDS);
+
+    }
+
+    private void fitLayout() {
+
+        fl_local.removeView(textureView);
+        fl_local.addView(textureView,new FrameLayout.LayoutParams(realWidth,realHeight));
+
+
+    }
+
+    private void fitMatrix() {
+
+        if(render_model == 0) {
+            //留黑边(大边铺满，小边留黑边)
+            if(widthRatio >= heightRatio){
+                //大边为宽
+                float scaleH = (realHeight * 1.0f) / mSurfaceHeight;
+                Matrix.scaleM(mMVPMatrix, 0, 1, scaleH, 1);
+            }else{
+                //大边为高
+                float scaleW = (realWidth * 1.0f) / mSurfaceWidth;
+                Matrix.scaleM(mMVPMatrix, 0, scaleW, 1, 1);
+            }
+        }else{
+            //裁剪(小边铺满，大边放大)
+            if(widthRatio >= heightRatio){
+                //高度铺满
+                float scaleW = realWidth / mSurfaceWidth;
+                Matrix.scaleM(mMVPMatrix, 0, scaleW, 1, 1);
+            }else{
+                //宽度铺满
+                float scaleH = realHeight / mSurfaceHeight;
+                Matrix.scaleM(mMVPMatrix, 0, 1, scaleH, 1);
+            }
+        }
+    }
+
 
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
@@ -361,7 +552,11 @@ public class PushExternalVideo extends BaseFragment implements View.OnClickListe
             mCamera.setPreviewTexture(mPreviewSurfaceTexture);
             /**The display orientation is 90 for both front and back facing cameras using a surface
              * texture for the preview when the screen is in portrait mode.*/
-            mCamera.setDisplayOrientation(90);
+            if(mScreenOri == this.getResources().getConfiguration().ORIENTATION_LANDSCAPE){
+                mCamera.setDisplayOrientation(180);
+            }else{
+                mCamera.setDisplayOrientation(90);
+            }
             mCamera.startPreview();
             mPreviewing = true;
         }

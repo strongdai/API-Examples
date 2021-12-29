@@ -119,4 +119,21 @@
         <item>FRAME_RATE_FPS_24</item>
         <item>FRAME_RATE_FPS_30</item>
     </string-array>
+
+
+
+    <string-array name="render_model">
+        <item>fit</item>
+        <item>crop</item>
+    </string-array>
+
+    <string-array name="implement_type">
+        <item>Modify_the_projection_matrix</item>
+        <item>Modify_the_parent_layout</item>
+        <item>Modify_the_coordinate_system</item>
+    </string-array>
+
+
+
+
 </resources>

@@ -3,14 +3,34 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
+    android:background="#FFFFFF"
     tools:context=".examples.basic.JoinChannelVideo">
+
+
+    <Spinner
+        android:id="@+id/render_model"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:entries="@array/render_model"
+        />
+
+    <Spinner
+        android:id="@+id/implement_type"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/render_model"
+        android:entries="@array/implement_type"
+        />
+
+
 
     <FrameLayout
         android:id="@+id/fl_local"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@+id/ll_join" />
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_centerInParent="true"
+        />
+    <!--    android:layout_above="@+id/ll_join"-->
 
     <FrameLayout
         android:id="@+id/fl_remote"

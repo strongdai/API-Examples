@@ -3,6 +3,8 @@ package io.agora.api.component.gles.core;
 import android.content.Context;
 import android.opengl.GLES20;
 
+import java.nio.FloatBuffer;
+
 /**
  * Created by tujh on 2018/1/24.
  */
@@ -36,6 +38,16 @@ public abstract class Program {
     public void updateTexCoordArray(float[] FULL_RECTANGLE_TEX_COORDS) {
         mDrawable2d.updateTexCoordArray(FULL_RECTANGLE_TEX_COORDS);
     }
+
+
+    public FloatBuffer vertexArray(){
+        return mDrawable2d.vertexArray();
+    }
+
+    public FloatBuffer texCoordArray(){
+        return mDrawable2d.texCoordArray();
+    }
+
 
     protected abstract Drawable2d getDrawable2d();
 
